@@ -1,0 +1,16 @@
+services:
+  wss:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "node server.js"
+    restart: always
+    volumes:
+      - .:/app
+    ports:
+      - "801:801"
+      - "8070:8070"
+    networks:
+      - global
+networks:
+  global:
+    external: true

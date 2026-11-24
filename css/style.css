@@ -1,0 +1,12 @@
+video:-webkit-full-screen, video:fullscreen { object-fit: contain !important; background-color: black; }
+
+.msg-bubble { max-width: 80%; word-wrap: break-word; position: relative; line-height: 1.4; }
+.msg-bubble.mine { background-color: var(--blue); color: var(--white); border-bottom-right-radius: 4px; }
+.msg-bubble.theirs { background-color: var(--gray100); color: var(--white); border-bottom-left-radius: 4px; }
+.msg-time { font-size: 10px; opacity: 0.7; margin-left: 8px; float: right; margin-top: 4px; }
+
+.voice-btn { background: var(--gray200); border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s; height: 48px; flex: 1; border: none; color: white; }
+.voice-btn:hover { background: var(--gray300); }
+.voice-btn-red { background: var(--red); }
+.voice-btn-red:hover { background: #d12c3d; }
+.voice-status { background: rgba(69, 190, 136, 0.1); color: var(--green); border-radius: 8px; padding: 8px 12px; font-weight: bold; }

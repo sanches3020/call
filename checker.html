@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Чекер</title>
+    <link rel="icon" href="data:,">
+    <style>
+        body { font-family: sans-serif; margin: 20px; display: flex; flex-direction: column; height: 90vh; }
+        #chat-window { flex: 1; border: 1px solid #ccc; padding: 10px; overflow-y: auto; margin-bottom: 10px; background: #f9f9f9; }
+        #message-form { display: flex; gap: 10px; }
+        #to-input { width: 120px; padding: 8px; }
+        #type-input { width: 100px; padding: 8px; }
+        #message-input { flex: 1; padding: 8px; }
+        button { padding: 8px 15px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<h2>Чат (<span id="username-display">...</span>)</h2>
+<div id="chat-window"></div>
+
+<form id="message-form">
+    <input type="text" id="to-input" placeholder="Кому (ID/Имя)..." required autocomplete="off">
+    <button type="button" id="call-btn">Позвонить</button>
+    <input type="text" id="type-input" placeholder="Тип..." value="text" required autocomplete="off">
+    <input type="text" id="message-input" placeholder="Введите сообщение..." required autocomplete="off">
+    <button type="submit" id="send-btn">Отправить</button>
+</form>
+<video id="video1" style="width: 600px;height: 400px;"> </video>
+<button id="button1">Шарить</button>
+<script src="call.js"></script>
+<script>
+    const urlParams = new URLSearchParams(location.search)
+    const userName = urlParams.get('name') || 'Аноним'
+
+    document.getElementById('username-display').textContent = userName
+
+    const wsUrl = "ws://localhost:8070"
+    const socketUrl = wsUrl + '?name=' + encodeURIComponent(userName)
+
+    const chatWindow = document.getElementById('chat-window')
+    const messageForm = document.getElementById('message-form')
+    const toInput = document.getElementById('to-input')
+    const typeInput = document.getElementById('type-input')
+    const messageInput = document.getElementById('message-input')
+    const button1Button = document.getElementById('button1')
+
+    function log(...args) {
+        const msgDiv = document.createElement('div')
+        msgDiv.textContent = args.join(' ')
+        chatWindow.appendChild(msgDiv)
+        chatWindow.scrollTop = chatWindow.scrollHeight
+    }
+
+    log('CONNECTING:', socketUrl)
+    const socket = new WebSocket(socketUrl)
+
+    socket.onopen = () => {
+        log('CONNECTED')
+        toInput.focus()
+    }
+
+    const sound_call = new Audio('/views/call/sounds/call.mp3')
+    sound_call.loop = true
+
+    socket.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data)
+            log('WS <-', data.type)
+            if (data.type === 'text') {
+                log(data.from, data.message)
+            }
+            if (data.type === 'call_start') {
+                incomingCall = data
+                sound_call.play()
+                callBtn.textContent = 'Ответить'
+            }
+            if (data.type === 'call_stop') {
+                incomingCall = null
+                sound_call.pause()
+                callBtn.textContent = 'Позвонить'
+            }
+            activeCall?.messageReceive(data)
+        } catch {
+            log(event.data)
+        }
+    }
+
+    socket.onclose = () => {
+        log('CLOSED')
+    }
+
+    socket.onerror = (error) => {
+        log('ERROR')
+        console.error(error)
+    }
+
+
+    let activeCall = null
+    let incomingCall = null
+    const callBtn = document.getElementById('call-btn')
+    button1Button.addEventListener('click', () => {
+        activeCall.shareScreen()
+    })
+    callBtn.addEventListener('click', () => {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+
+            if (!activeCall) { // позвонить
+                const to = incomingCall ? incomingCall.from : toInput.value.trim()
+                if (!to) return
+
+                activeCall = new Call((type, message) => {
+                    socket.send(JSON.stringify({ to, type, message }))
+                    log('WS ->', type)
+                },  (state) => {
+                    if (state === 'call_start') {
+                        sound_call.play()
+                    }
+                    if (state === 'call_connecting') {
+                        sound_call.pause()
+                    }
+                    if (state === 'call_stop' || state === 'error') {
+                        activeCall = null
+                        callBtn.textContent = 'Позвонить'
+                    }
+                },"video1")
+
+                if (incomingCall) {
+                    activeCall.messageReceive(incomingCall)
+                } else {
+                    activeCall.callStart()
+                }
+                incomingCall = null
+                callBtn.textContent = 'Завершить'
+            } else { // Завершить
+                stream.getTracks().forEach(track => track.stop())
+                sound_call.pause()
+                activeCall.hangup()
+                callBtn.textContent = 'Позвонить'
+            }
+
+        }).catch(error => log('MIC ERROR:', error.name, error.message))
+    })
+
+    messageForm.addEventListener('submit', (event) => {
+        event.preventDefault()
+        const to = toInput.value
+        const type = typeInput.value
+        const message = messageInput.value
+
+        if (to && type && message && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({
+                to: to,
+                type: type,
+                message: message
+            }))
+            if (type === 'text') {
+                log('TO:', to, message)
+            }
+
+            messageInput.value = ''
+            messageInput.focus()
+        }
+    })
+</script>
+</body>
+</html>
