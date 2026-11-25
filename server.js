@@ -31,9 +31,9 @@ wss.on('connection', (client, request) => {
             fs.appendFileSync("history.jsonl", JSON.stringify(data) + "\n")
         }
 
-        allClients.forEach(client => {
-            if (client.name === data.to && client.readyState === 1) {
-                client.send(JSON.stringify({from: client.name, type: data.type, message: data.message}))
+        allClients.forEach(target => {
+            if (target.name === data.to && target.readyState === 1) {
+                target.send(JSON.stringify({from: client.name, type: data.type, message: data.message}))
             }
         })
     })

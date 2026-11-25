@@ -1,13 +1,12 @@
 const RTC_CONFIG = {
     iceServers: [/*{
-        urls: 'stun:stun.l.google.com:19302'
+        urls: 'stun:://google.com'
     }, */{
         urls: 'turn:77.37.49.7:3478',
         username: 'user',
         credential: 'pass'
     }]
 }
-
 class Call {
     peer = null
     audioStream = null
@@ -27,7 +26,6 @@ class Call {
         this.status = status || function () {
         }
         this.videoElementId = videoElementId
-
         this.peer = new RTCPeerConnection(RTC_CONFIG)
         this.peer.onconnectionstatechange = () => {
             if (this.peer.connectionState === 'connected') {
@@ -46,41 +44,37 @@ class Call {
                 }
             }
         }
-
         this.peer.ontrack = (event) => {
             this.streamPlay(event)
         }
     }
-
     streamPlay(event) {
-        if (event.streams && event.streams[0]) {
-            if (event.track.kind === 'audio') {
-                let audio = new Audio()
-                audio.srcObject = event.streams[0]
-                audio.play()
-                this.status('audio_play')
-                this.initAudioAnalyser(event.streams[0])
-            } else if (event.track.kind === 'video') {
-                this.screenStream = event.streams[0]
-                this.status('video_play')
-                setTimeout(() => { // for update ui and show videoElementId
-                    let videoEl = document.getElementById(this.videoElementId)
-                    if (videoEl) {
-                        videoEl.srcObject = event.streams[0]
-                        videoEl.play()
-                    }
-                }, 50)
+        if (event.track.kind === 'audio') {
+            const stream = (event.streams && event.streams.at(0)) || new MediaStream([event.track])
+            let audio = new Audio()
+            audio.srcObject = stream
+            audio.play()
+            this.status('audio_play')
+            this.initAudioAnalyser(stream)
+        } else if (event.track.kind === 'video') {
+            const stream = (event.streams && event.streams.at(0)) || new MediaStream([event.track])
+            this.screenStream = stream
+            this.status('video_play')
+            let videoEl = document.getElementById(this.videoElementId)
+            if (videoEl) {
+                videoEl.srcObject = stream
+                videoEl.muted = true
+                videoEl.play().catch(() => {})
             }
         }
     }
-
     async callStart() {
         try {
             this.audioStream = await navigator.mediaDevices.getUserMedia({audio: true})
             this.audioStream.getTracks().forEach((track) => {
                 this.peer.addTrack(track, this.audioStream)
             })
-            const offer = await this.peer.createOffer({offerToReceiveAudio: true, offerToReceiveVideo: true})
+            const offer = await this.peer.createOffer()
             await this.peer.setLocalDescription(offer)
             this.status('call_start', 'Ждём ответа...')
             this.send('call_start', this.peer.localDescription)
@@ -88,7 +82,6 @@ class Call {
             this.status('error', error.toString())
         }
     }
-
     async messageReceive(data) {
         if (data.type === 'call_start') {
             try {
@@ -109,7 +102,8 @@ class Call {
             if (this.peer) {
                 try {
                     await this.peer.setRemoteDescription(data.message)
-                    await this.peer.setLocalDescription(await this.peer.createAnswer())
+                    const answer = await this.peer.createAnswer()
+                    await this.peer.setLocalDescription(answer)
                     this.send('call_answer', this.peer.localDescription)
                 } catch (err) {
                     this.status('error', err.toString())
@@ -142,7 +136,6 @@ class Call {
             this.status('video_stop')
         }
     }
-
     callConnected() {
         if (!this.durationTimer) {
             this.durationTimer = setInterval(() => {
@@ -154,10 +147,9 @@ class Call {
         }
         this.status('call_connected', 'Подключено')
     }
-
     toggleMute() {
-        if (this.audioStream && this.audioStream.getAudioTracks()[0]) {
-            let track = this.audioStream.getAudioTracks()[0]
+        if (this.audioStream && this.audioStream.getAudioTracks().at(0)) {
+            let track = this.audioStream.getAudioTracks().at(0)
             if (track.enabled) {
                 track.enabled = false
                 this.status('audio_mute')
@@ -167,14 +159,13 @@ class Call {
             }
         }
     }
-
     async shareScreen() {
         try {
             this.screenStream = await navigator.mediaDevices.getDisplayMedia({video: true})
-            const screenTrack = this.screenStream.getVideoTracks()[0]
+            const screenTrack = this.screenStream.getVideoTracks().at(0)
             if (this.peer) {
                 this.peer.addTrack(screenTrack, this.screenStream)
-                const offer = await this.peer.createOffer({offerToReceiveAudio: true, offerToReceiveVideo: true})
+                const offer = await this.peer.createOffer()
                 await this.peer.setLocalDescription(offer)
                 this.send('call_offer', this.peer.localDescription)
                 this.status('video_start')
@@ -184,7 +175,6 @@ class Call {
             this.status('error', error.toString())
         }
     }
-
     stopScreenShare() {
         if (this.screenStream) {
             this.screenStream.getTracks().forEach(track => track.stop())
@@ -197,7 +187,6 @@ class Call {
             this.screenStream = null
         }
     }
-
     initAudioAnalyser(stream) {
         let ctx = new (window.AudioContext || window.webkitAudioContext)()
         let src = ctx.createMediaStreamSource(stream)
@@ -231,12 +220,10 @@ class Call {
         }
         checkVolume()
     }
-
     hangup() {
         this.callStop()
         this.send('call_stop')
     }
-
     callStop() {
         this.audioStream?.getTracks().forEach(track => track.stop())
         this.screenStream?.getTracks().forEach(track => track.stop())

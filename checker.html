@@ -27,43 +27,35 @@
     <input type="text" id="message-input" placeholder="Введите сообщение..." required autocomplete="off">
     <button type="submit" id="send-btn">Отправить</button>
 </form>
-<video id="video1" style="width: 600px;height: 400px;"> </video>
+<video id="video1" autoplay muted playsinline style="width: 600px;height: 400px;"> </video>
 <button id="button1">Шарить</button>
 <script src="call.js"></script>
 <script>
     const urlParams = new URLSearchParams(location.search)
     const userName = urlParams.get('name') || 'Аноним'
-
     document.getElementById('username-display').textContent = userName
-
     const wsUrl = "ws://localhost:8070"
     const socketUrl = wsUrl + '?name=' + encodeURIComponent(userName)
-
     const chatWindow = document.getElementById('chat-window')
     const messageForm = document.getElementById('message-form')
     const toInput = document.getElementById('to-input')
     const typeInput = document.getElementById('type-input')
     const messageInput = document.getElementById('message-input')
     const button1Button = document.getElementById('button1')
-
     function log(...args) {
         const msgDiv = document.createElement('div')
         msgDiv.textContent = args.join(' ')
         chatWindow.appendChild(msgDiv)
         chatWindow.scrollTop = chatWindow.scrollHeight
     }
-
     log('CONNECTING:', socketUrl)
     const socket = new WebSocket(socketUrl)
-
     socket.onopen = () => {
         log('CONNECTED')
         toInput.focus()
     }
-
     const sound_call = new Audio('/views/call/sounds/call.mp3')
     sound_call.loop = true
-
     socket.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data)
@@ -73,11 +65,16 @@
             }
             if (data.type === 'call_start') {
                 incomingCall = data
+                pendingCandidates = []
                 sound_call.play()
                 callBtn.textContent = 'Ответить'
             }
+            if (data.type === 'call_candidate' && !activeCall) {
+                pendingCandidates.push(data)
+            }
             if (data.type === 'call_stop') {
                 incomingCall = null
+                pendingCandidates = []
                 sound_call.pause()
                 callBtn.textContent = 'Позвонить'
             }
@@ -86,34 +83,29 @@
             log(event.data)
         }
     }
-
     socket.onclose = () => {
         log('CLOSED')
     }
-
     socket.onerror = (error) => {
         log('ERROR')
         console.error(error)
     }
-
-
     let activeCall = null
     let incomingCall = null
+    let pendingCandidates = []
     const callBtn = document.getElementById('call-btn')
     button1Button.addEventListener('click', () => {
-        activeCall.shareScreen()
+        activeCall?.shareScreen()
     })
     callBtn.addEventListener('click', () => {
         navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-
-            if (!activeCall) { // позвонить
+            if (!activeCall) {
                 const to = incomingCall ? incomingCall.from : toInput.value.trim()
                 if (!to) return
-
                 activeCall = new Call((type, message) => {
                     socket.send(JSON.stringify({ to, type, message }))
                     log('WS ->', type)
-                },  (state) => {
+                }, (state) => {
                     if (state === 'call_start') {
                         sound_call.play()
                     }
@@ -124,31 +116,29 @@
                         activeCall = null
                         callBtn.textContent = 'Позвонить'
                     }
-                },"video1")
-
+                }, "video1")
                 if (incomingCall) {
                     activeCall.messageReceive(incomingCall)
+                    pendingCandidates.forEach(c => activeCall.messageReceive(c))
+                    pendingCandidates = []
                 } else {
                     activeCall.callStart()
                 }
                 incomingCall = null
                 callBtn.textContent = 'Завершить'
-            } else { // Завершить
+            } else {
                 stream.getTracks().forEach(track => track.stop())
                 sound_call.pause()
                 activeCall.hangup()
                 callBtn.textContent = 'Позвонить'
             }
-
         }).catch(error => log('MIC ERROR:', error.name, error.message))
     })
-
     messageForm.addEventListener('submit', (event) => {
         event.preventDefault()
         const to = toInput.value
         const type = typeInput.value
         const message = messageInput.value
-
         if (to && type && message && socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({
                 to: to,
@@ -158,7 +148,6 @@
             if (type === 'text') {
                 log('TO:', to, message)
             }
-
             messageInput.value = ''
             messageInput.focus()
         }
