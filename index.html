@@ -45,6 +45,13 @@
     const typeInput = document.getElementById('type-input')
     const messageInput = document.getElementById('message-input')
     const button1Button = document.getElementById('button1')
+    const videoEl = document.getElementById('video1')
+    videoEl?.addEventListener('dblclick', () => {
+        if (!videoEl) return
+        document.fullscreenElement
+            ? document.exitFullscreen()
+            : videoEl.requestFullscreen().catch(() => {})
+    })
 
     function log(...args) {
         const msgDiv = document.createElement('div')
