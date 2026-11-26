@@ -16,10 +16,8 @@
     </style>
 </head>
 <body>
-
 <h2>Чат (<span id="username-display">...</span>)</h2>
 <div id="chat-window"></div>
-
 <form id="message-form">
     <input type="text" id="to-input" placeholder="Кому (ID/Имя)..." required autocomplete="off">
     <button type="button" id="call-btn">Позвонить</button>
@@ -42,6 +40,13 @@
     const typeInput = document.getElementById('type-input')
     const messageInput = document.getElementById('message-input')
     const button1Button = document.getElementById('button1')
+    const videoEl = document.getElementById('video1')
+    videoEl?.addEventListener('dblclick', () => {
+        if (!videoEl) return
+        document.fullscreenElement
+            ? document.exitFullscreen()
+            : videoEl.requestFullscreen().catch(() => {})
+    })
     function log(...args) {
         const msgDiv = document.createElement('div')
         msgDiv.textContent = args.join(' ')
@@ -54,11 +59,12 @@
         log('CONNECTED')
         toInput.focus()
     }
-    const sound_call = new Audio('/views/call/sounds/call.mp3')
+    const sound_call = new Audio('/sounds/call.mp3')
     sound_call.loop = true
     socket.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data)
+            if (data.from === userName) return
             log('WS <-', data.type)
             if (data.type === 'text') {
                 log(data.from, data.message)
@@ -105,12 +111,15 @@
                 activeCall = new Call((type, message) => {
                     socket.send(JSON.stringify({ to, type, message }))
                     log('WS ->', type)
-                }, (state) => {
+                }, (state, msg) => {
                     if (state === 'call_start') {
                         sound_call.play()
                     }
                     if (state === 'call_connecting') {
                         sound_call.pause()
+                    }
+                    if (state === 'error') {
+                        log('CALL ERROR:', msg)
                     }
                     if (state === 'call_stop' || state === 'error') {
                         activeCall = null
