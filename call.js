@@ -1,7 +1,7 @@
 const RTC_CONFIG = {
-    iceServers: [/*{
+    iceServers: [{
         urls: 'stun:stun.l.google.com:19302'
-    }, */{
+    }, {
         urls: 'turn:77.37.49.7:3478',
         username: 'user',
         credential: 'pass'

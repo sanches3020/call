@@ -1,46 +1,54 @@
 import express from 'express'
 import fs from 'fs'
+import http from 'http'
 const app = express()
 app.use(express.static('.'))
-app.listen(801)
+
+const server = http.createServer(app)
 
 import {WebSocketServer} from 'ws'
-const wss = new WebSocketServer({port: 8070})
+const wss = new WebSocketServer({ server })
 
-const allClients = []
+const connections = []
 
 var users = []
 var history = []
-if(fs.existsSync("history.jsonl"))
-    history = fs.readFileSync("history.jsonl", { encoding: 'utf8'}).split("\n").filter(Boolean)
-for(var line of history){
+if (fs.existsSync("history.jsonl"))
+    history = fs.readFileSync("history.jsonl", { encoding: 'utf8' }).split("\n").filter(Boolean)
+for (var line of history) {
     users.push(JSON.parse(line))
 }
 
 
-wss.on('connection', (client, request) => {
+wss.on('connection', (conn, request) => {
     const name = new URLSearchParams(request.url.split('?')[1] ?? '').get('name')
 
-    if (!name || allClients.some(s => s.name === name)) return client.close()
+    if (!name || connections.some(s => s.name === name)) return conn.close()
 
-    client.name = name
+    connections.push(conn)
+    conn.name = name
 
-    client.on('message', (message) => {
+    conn.on('message', (message) => {
         const data = JSON.parse(message)
-        if(data.type === "user_info"){
+        if (data.type === "user_info") {
             fs.appendFileSync("history.jsonl", JSON.stringify(data) + "\n")
         }
 
-        allClients.forEach(client => {
+        connections.forEach(client => {
             if (client.name === data.to && client.readyState === 1) {
-                client.send(JSON.stringify({from: client.name, type: data.type, message: data.message}))
+                client.send(JSON.stringify({from: conn.name, type: data.type, message: data.message}))
             }
         })
     })
 
-    client.on('close', () => allClients.splice(allClients.indexOf(client), 1))
+    conn.on('close', () => connections.splice(connections.indexOf(conn), 1))
 
-    allClients.push(client)
 })
 import logger from './logger.js'
 logger.init(wss)
+
+const PORT = process.env.PORT ?? 801
+server.listen(PORT, () => {
+    console.log('HTTP + WebSocket listening on port ' + PORT)
+    logger.log('START on port ' + PORT)
+})

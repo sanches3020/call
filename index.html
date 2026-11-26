@@ -36,7 +36,7 @@
 
     document.getElementById('username-display').textContent = userName
 
-    const wsUrl = "ws://localhost:8070"
+    const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host
     const socketUrl = wsUrl + '?name=' + encodeURIComponent(userName)
 
     const chatWindow = document.getElementById('chat-window')
@@ -61,7 +61,7 @@
         toInput.focus()
     }
 
-    const sound_call = new Audio('/views/call/sounds/call.mp3')
+    const sound_call = new Audio('/sounds/call.mp3')
     sound_call.loop = true
 
     socket.onmessage = (event) => {

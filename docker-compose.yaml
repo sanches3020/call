@@ -8,7 +8,6 @@ services:
       - .:/app
     ports:
       - "801:801"
-      - "8070:8070"
     networks:
       - global
 networks:
