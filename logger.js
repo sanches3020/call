@@ -31,8 +31,6 @@ export default {
     },
 
     init(wss) {
-        this.log('START :8080')
-
         wss.on('error', this.error)
 
         wss.on('connection', (socket, req) => {
