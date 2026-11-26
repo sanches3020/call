@@ -1,19 +1,21 @@
 import express from 'express'
 import fs from 'fs'
+import http from 'http'
 const app = express()
 app.use(express.static('.'))
-app.listen(801)
+
+const server = http.createServer(app)
 
 import {WebSocketServer} from 'ws'
-const wss = new WebSocketServer({port: 8070})
+const wss = new WebSocketServer({ server })
 
 const allClients = []
 
 var users = []
 var history = []
-if(fs.existsSync("history.jsonl"))
-    history = fs.readFileSync("history.jsonl", { encoding: 'utf8'}).split("\n").filter(Boolean)
-for(var line of history){
+if (fs.existsSync("history.jsonl"))
+    history = fs.readFileSync("history.jsonl", { encoding: 'utf8' }).split("\n").filter(Boolean)
+for (var line of history) {
     users.push(JSON.parse(line))
 }
 
@@ -27,7 +29,7 @@ wss.on('connection', (client, request) => {
 
     client.on('message', (message) => {
         const data = JSON.parse(message)
-        if(data.type === "user_info"){
+        if (data.type === "user_info") {
             fs.appendFileSync("history.jsonl", JSON.stringify(data) + "\n")
         }
 
@@ -44,3 +46,7 @@ wss.on('connection', (client, request) => {
 })
 import logger from './logger.js'
 logger.init(wss)
+
+server.listen(801, () => {
+    console.log('HTTP + WebSocket listening on port 801')
+})

@@ -36,7 +36,7 @@
 
     document.getElementById('username-display').textContent = userName
 
-    const wsUrl = "ws://localhost:8070"
+    const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host
     const socketUrl = wsUrl + '?name=' + encodeURIComponent(userName)
 
     const chatWindow = document.getElementById('chat-window')
